@@ -154,6 +154,7 @@ def main():
     print('\nBuild ort model done.')
 
     for epoch in range(1, args.epochs + 1):
+        trainer.test()
         train_with_trainer(args, trainer, device, train_loader, epoch)
         import pdb
         test_with_trainer(args, trainer, device, test_loader)

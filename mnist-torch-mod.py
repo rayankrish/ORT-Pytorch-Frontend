@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch_optimizer as optim2
+#import torch_optimizer as optim2
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 import pickle
@@ -140,7 +140,7 @@ def main():
 
     model = Net().to(device)
     #optimizer = optim2.Lamb(model.parameters(), lr=0.01) #optim.Adadelta(model.parameters(), lr=args.lr)
-    optimizer = optim.SGD(model.parameters(), lr=0.01)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr)
     if args.set_weights:
         model.load_state_dict(torch.load("models/init_weights.pt"))
 

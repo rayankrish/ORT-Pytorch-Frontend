@@ -16,6 +16,8 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 import numpy as np
 import os
+import pickle
+from pathlib import Path
 
 from onnxruntime.capi.ort_trainer import IODescription, ModelDescription, ORTTrainer
 from mpi4py import MPI
@@ -39,10 +41,21 @@ def my_loss(x, target):
     return F.nll_loss(F.log_softmax(x, dim=1), target)
 
 def train_with_trainer(args, trainer, device, train_loader, epoch):
+    losses = []
+    parameters = []
+    iteration = 0
+    while Path("models/ort/run_{}_epoch_{}.pk".format(iteration, epoch)).is_file(): iteration+=1
+
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         data = data.reshape(data.shape[0], -1)
 
+        if batch_idx == 0:
+            learning_rate = torch.tensor([args.lr])
+            trainer._force_init_model(data, target, learning_rate)
+            #save weights
+            parameters.append(trainer._get_onnx())
+            
         learning_rate = torch.tensor([args.lr])
         loss = trainer.train_step(data, target, learning_rate)
 
@@ -51,6 +64,13 @@ def train_with_trainer(args, trainer, device, train_loader, epoch):
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss[0]))
+            #print(trainer._get_onnx())
+            losses.append(loss)
+            parameters.append(trainer._get_onnx())
+    
+    if args.save_full:
+        outfile = "models/ort/run_{}_epoch_{}.pk".format(iteration, epoch)
+        torch.save((losses, parameters), outfile)
 
 # TODO: comple this once ORT training can do evaluation.
 def test_with_trainer(args, trainer, device, test_loader):
@@ -107,6 +127,8 @@ def main():
     parser.add_argument('--set-weights', action='store_true', default=False,
                         help='Initialize model with given weights')
 
+    parser.add_argument('--save-full', action='store_true', default=False,
+                        help='Save intermediate weights')
 
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -153,8 +175,13 @@ def main():
     trainer = ORTTrainer(model, my_loss, model_desc, "SGDOptimizer", None, IODescription('Learning_Rate', [1,], torch.float32), device, gradient_accumulation_steps = 1, world_rank=args.world_rank, world_size=args.world_size, use_mixed_precision=False, allreduce_post_accumulation = True)
     print('\nBuild ort model done.')
 
+    # force model preprocessing
+    #mnist_data = datasets.MNIST('../data', train=True, download=True, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]))
+    #print(mnist_data[0])
+    #trainer._force_init_model(mnist_data[0])
+
     for epoch in range(1, args.epochs + 1):
-        trainer.test()
+        print(trainer.test())
         train_with_trainer(args, trainer, device, train_loader, epoch)
         import pdb
         test_with_trainer(args, trainer, device, test_loader)

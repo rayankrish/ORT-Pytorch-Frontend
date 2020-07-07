@@ -65,7 +65,7 @@ def train_with_trainer(args, trainer, device, train_loader, epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss[0]))
             #print(trainer._get_onnx())
-            losses.append(loss)
+            losses.append(loss[0].item())
             parameters.append(trainer._get_onnx())
     
     if args.save_full:

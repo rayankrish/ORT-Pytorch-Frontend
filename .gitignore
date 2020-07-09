@@ -6,3 +6,7 @@ __pycache__/
 
 # saved state of the models
 #models/
+
+
+# notebook checkpoints
+.ipynb_checkpoints/
